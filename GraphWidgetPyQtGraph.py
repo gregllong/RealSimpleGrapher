@@ -31,7 +31,8 @@ class Graph_PyQtGraph(QtGui.QWidget):
         self.show_points = config.show_points
         self.grid_on = config.grid_on
         self.scatter_plot = config.scatter_plot
-
+        self.plot_only_new_data = config.plot_only_new_data
+        self._old_data_len = 0
         self.dataset_queue = Queue.Queue(config.max_datasets)
 
         self.live_update_loop = LoopingCall(self.update_figure)
@@ -70,16 +71,28 @@ class Graph_PyQtGraph(QtGui.QWidget):
     def update_figure(self):
         for ident, params in self.artists.iteritems():
             if params.shown:
-                try:
-                    ds = params.dataset
-                    index = params.index
-                    current_update = ds.updateCounter
-                    if params.last_update < current_update:
-                        x = ds.data[:,0]
-                        y = ds.data[:,index+1]
-                        params.last_update = current_update
-                        params.artist.setData(x,y)
-                except: pass
+                if self.plot_only_new_data:
+                    try:
+                        ds = params.dataset
+                        index = params.index
+                        x = ds.data[self._old_data_len:, 0]
+                        y = ds.data[self._old_data_len:, index+1]
+                        params.artist.setData(x, y)
+                        self._old_data_len = self._old_data_len + len(x)
+                        print "updated old data length = ", self._old_data_len
+                    except:
+                        pass
+                else:
+                    try:
+                        ds = params.dataset
+                        index = params.index
+                        current_update = ds.updateCounter
+                        if params.last_update < current_update:
+                            x = ds.data[:, 0]
+                            y = ds.data[:, index+1]
+                            params.last_update = current_update
+                            params.artist.setData(x, y)
+                    except: pass
 
     def add_artist(self, ident, dataset, index, no_points = False):
         '''
